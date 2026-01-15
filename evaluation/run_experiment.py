@@ -9,7 +9,7 @@ from tqdm import tqdm
 from evaluation.load_models import load_all_models
 from evaluation.generation_functions import generate_with_base_model, generate_with_cp_delta, generate_with_seb
 from utils.mia_analysis import MIAAnalyzer
-from utils.hidden_state import HIDDEN_STATE_CONFIG
+from utils.output_hidden_state import HIDDEN_STATE_CONFIG
 
 def parse_args():
     parser = argparse.ArgumentParser()
