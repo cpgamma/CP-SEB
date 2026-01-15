@@ -50,43 +50,43 @@ class MIAAnalyzer:
             return 1.0
         return len(ng1 & ng2) / len(ng1 | ng2)
 
-    def compute_all_similarities(self, generated_text, candidate_idx):
-        candidate_text = self.train_texts[candidate_idx]
+    def compute_all_similarities(self, generated_text, target_idx):
+        target_text = self.train_texts[target_idx]
         
         gen_embedding = self.sentence_model.encode([generated_text])
-        cand_embedding = self.embeddings[candidate_idx].reshape(1, -1)
-        cosine_sim = cosine_similarity(gen_embedding, cand_embedding)[0][0]
+        target_embedding = self.embeddings[target_idx].reshape(1, -1)
+        cosine_sim = cosine_similarity(gen_embedding, target_embedding)[0][0]
         
-        rouge_scores = self.rouge_scorer.score(generated_text, candidate_text)
+        rouge_scores = self.rouge_scorer.score(generated_text, target_text)
         rouge_l_f1 = rouge_scores['rougeL'].fmeasure
         rouge_l_recall = rouge_scores['rougeL'].recall
         rouge_l_precision = rouge_scores['rougeL'].precision
         
-        bert_results = self.compute_bert_score(generated_text, candidate_text)
+        bert_results = self.compute_bert_score(generated_text, target_text)
         bert_f1 = bert_results['bert_f1']
         bert_precision = bert_results['bert_precision']
         bert_recall = bert_results['bert_recall']
         
         gen_words = set(generated_text.lower().split())
-        cand_words = set(candidate_text.lower().split())
-        jaccard_words = len(gen_words & cand_words) / max(len(gen_words | cand_words), 1)
+        target_words = set(target_text.lower().split())
+        jaccard_words = len(gen_words & target_words) / max(len(gen_words | target_words), 1)
         
-        bigram_jaccard = self.jaccard_ngrams(generated_text, candidate_text, n=2)
-        trigram_jaccard = self.jaccard_ngrams(generated_text, candidate_text, n=3)
+        bigram_jaccard = self.jaccard_ngrams(generated_text, target_text, n=2)
+        trigram_jaccard = self.jaccard_ngrams(generated_text, target_text, n=3)
         
         max_len_for_edit = 5000
-        if len(generated_text) < max_len_for_edit and len(candidate_text) < max_len_for_edit:
-            levenshtein_dist = Levenshtein.distance(generated_text, candidate_text)
-            levenshtein_ratio = Levenshtein.ratio(generated_text, candidate_text)
-            jaro_winkler = jellyfish.jaro_winkler_similarity(generated_text, candidate_text)
+        if len(generated_text) < max_len_for_edit and len(target_text) < max_len_for_edit:
+            levenshtein_dist = Levenshtein.distance(generated_text, target_text)
+            levenshtein_ratio = Levenshtein.ratio(generated_text, target_text)
+            jaro_winkler = jellyfish.jaro_winkler_similarity(generated_text, target_text)
             
-            max_len = min(max(len(generated_text), len(candidate_text)), 2000)
+            max_len = min(max(len(generated_text), len(target_text)), 2000)
             gen_padded = generated_text[:max_len].ljust(max_len)
-            cand_padded = candidate_text[:max_len].ljust(max_len)
-            hamming_dist = sum(c1 != c2 for c1, c2 in zip(gen_padded, cand_padded))
+            target_padded = target_text[:max_len].ljust(max_len)
+            hamming_dist = sum(c1 != c2 for c1, c2 in zip(gen_padded, target_padded))
             hamming_ratio = 1.0 - (hamming_dist / max_len)
             
-            string_match = SequenceMatcher(None, candidate_text, generated_text).ratio()
+            string_match = SequenceMatcher(None, target_text, generated_text).ratio()
         else:
             levenshtein_dist = None
             levenshtein_ratio = None
@@ -96,7 +96,6 @@ class MIAAnalyzer:
             string_match = None
         
         return {
-            'candidate_idx': candidate_idx,
             'cosine': cosine_sim,
             'rougeL_f1': rouge_l_f1,
             'rougeL_recall': rouge_l_recall,
@@ -115,25 +114,14 @@ class MIAAnalyzer:
             'string_match': string_match,
         }
 
-    def analyze_generated_text(self, generated_text, source_indices, threshold=0.87, max_candidates=15):
+    def analyze_generated_text(self, generated_text, source_idx):
+        target_text = self.train_texts[source_idx]
+        
         gen_embedding = self.sentence_model.encode([generated_text])
+        target_embedding = self.embeddings[source_idx].reshape(1, -1)
+        cosine_sim = cosine_similarity(gen_embedding, target_embedding)[0][0]
         
-        similarities = cosine_similarity(gen_embedding, self.embeddings)[0]
+        metrics = self.compute_all_similarities(generated_text, source_idx)
+        metrics['embedding_cosine'] = cosine_sim
         
-        above_threshold = np.where(similarities >= threshold)[0]
-        top_k_indices = np.argsort(similarities)[::-1][:max_candidates]
-        
-        candidate_indices = set(top_k_indices.tolist())
-        candidate_indices.update(source_indices)
-        candidate_indices.update(above_threshold.tolist())
-        candidate_indices = sorted(list(candidate_indices),
-                                   key=lambda x: similarities[x], reverse=True)[:max_candidates]
-        
-        results = []
-        for idx in candidate_indices:
-            metrics = self.compute_all_similarities(generated_text, idx)
-            metrics['embedding_cosine_topk'] = similarities[idx]
-            metrics['is_source_index'] = idx in source_indices
-            results.append(metrics)
-        
-        return pd.DataFrame(results)
+        return metrics

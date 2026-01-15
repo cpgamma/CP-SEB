@@ -9,7 +9,7 @@ from tqdm import tqdm
 from evaluation.load_models import load_all_models
 from evaluation.generation_functions import generate_with_base_model, generate_with_cp_delta, generate_with_seb
 from utils.mia_analysis import MIAAnalyzer
-from utils.output_hidden_state import HIDDEN_STATE_CONFIG
+from utils.hidden_state import HIDDEN_STATE_CONFIG
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -55,7 +55,7 @@ def save_results_incremental(output_dir, generation_results, mia_results, hidden
         gen_df.to_csv(gen_output, index=False, quoting=1, escapechar='\\')
     
     if mia_results:
-        mia_df = pd.concat(mia_results, ignore_index=True)
+        mia_df = pd.DataFrame(mia_results)
         mia_output = f"{output_dir}/ALL_MIA_RESULTS.csv"
         mia_df.to_csv(mia_output, index=False)
     
@@ -142,11 +142,18 @@ def run_experiment(prompts_data, models, train_texts, embeddings, output_dir, co
                     all_generation_results.append(result)
                     
                     print(f"    MIA analysis...")
-                    mia_df = mia_analyzer.analyze_generated_text(text, [source_idx])
-                    mia_df['prompt_id'] = prompt_id
-                    mia_df['source_idx'] = source_idx
-                    mia_df['method'] = method_name
-                    all_mia_results.append(mia_df)
+                    mia_metrics = mia_analyzer.analyze_generated_text(text, source_idx)
+                    
+                    mia_result = {
+                        'prompt_id': prompt_id,
+                        'source_idx': source_idx,
+                        'method': method_name,
+                        **mia_metrics
+                    }
+                    
+                    all_mia_results.append(mia_result)
+                    
+                    print(f"      Cosine: {mia_metrics['cosine']:.4f}, ROUGE-L: {mia_metrics['rougeL_f1']:.4f}")
                     
                     print(f"    Hidden state analysis...")
                     original_text = train_texts[source_idx]
@@ -202,13 +209,11 @@ def run_experiment(prompts_data, models, train_texts, embeddings, output_dir, co
     
     print("\nCreating comprehensive results...")
     gen_df = pd.DataFrame(all_generation_results)
-    mia_df = pd.concat(all_mia_results, ignore_index=True)
+    mia_df = pd.DataFrame(all_mia_results)
     hidden_df = pd.DataFrame(all_hidden_results)
     
-    mia_source = mia_df[mia_df['is_source_index'] == True].copy()
-    
     comprehensive = gen_df.merge(
-        mia_source[['prompt_id', 'method', 'cosine', 'rougeL_f1', 'bert_f1']],
+        mia_df[['prompt_id', 'method', 'cosine', 'rougeL_f1', 'bert_f1', 'jaccard_words', 'levenshtein_ratio']],
         on=['prompt_id', 'method'],
         how='left'
     )

@@ -20,15 +20,15 @@ def create_summary_statistics(df):
             'avg_generation_time': method_df['generation_time'].mean(),
             'avg_perplexity_mean': method_df.get('perplexity_mean', pd.Series([None])).mean(),
             'avg_entropy_mean': method_df.get('entropy_mean', pd.Series([None])).mean(),
-            'avg_cosine_source': method_df['cosine'].mean(),
-            'max_cosine_source': method_df['cosine'].max(),
-            'avg_rougeL_f1_source': method_df['rougeL_f1'].mean(),
-            'avg_bert_f1_source': method_df.get('bert_f1', pd.Series([None])).mean(),
+            'avg_cosine_target': method_df['cosine'].mean(),
+            'max_cosine_target': method_df['cosine'].max(),
+            'avg_rougeL_f1_target': method_df['rougeL_f1'].mean(),
+            'avg_bert_f1_target': method_df.get('bert_f1', pd.Series([None])).mean(),
             'avg_hidden_similarity': method_df['hidden_state_similarity'].mean(),
             'max_hidden_similarity': method_df['hidden_state_similarity'].max(),
             'hidden_leakage_count': method_df['is_leaked'].sum(),
             'hidden_leakage_rate': method_df['is_leaked'].mean(),
-            'combined_leakage': ((method_df['cosine'] >= 0.85) & (method_df['is_leaked'] == True)).sum(),
+            'combined_leakage': ((method_df['is_leaked'] == True)).sum(),
             'seb_intervention_rate': method_df.get('seb_intervention_rate', pd.Series([None])).mean(),
         }
         
@@ -52,7 +52,7 @@ def main():
     summary_output = f"{args.output_dir}/SUMMARY_STATISTICS.csv"
     summary_df.to_csv(summary_output, index=False)
     print(f"\nSaved: {summary_output}")
-    
+
     
     print("\nAnalysis complete!")
 
