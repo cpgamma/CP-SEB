@@ -113,10 +113,13 @@ python training/train_models.py \
 ```bash
 python evaluation/generate_prompts.py \
     --articles data/combined_train_shard.jsonl \
+    --embeddings data/embeddings.npy \        
     --num-prompts 100 \
     --gpt-model gpt-4 \
     --api-key $OPENAI_API_KEY \
     --output results/prompts.csv \
+    --neighbor-threshold 0.85 \                  
+    --max-neighbors 5 \                          
     --max-retries 10
 ```
 
